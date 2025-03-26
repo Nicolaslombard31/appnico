@@ -1,5 +1,12 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter, useSegments } from "expo-router";
-import { createContext, useContext, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
 
 type User = {
   id: number;
@@ -32,10 +39,56 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const segments = useSegments();
 
+  const checkAndRedirect = useCallback(() => {
+    const inAuthGroup = segments[0] === "auth";
+
+    if (!userToken && !inAuthGroup && !isLoading) {
+      router.replace("/auth/login");
+    } else if (userToken && inAuthGroup) {
+      router.replace("/");
+    }
+  }, [userToken, isLoading, segments, router]);
+
+  useEffect(() => {
+    checkAndRedirect();
+  }, [checkAndRedirect]);
+
+  useEffect(() => {
+    const loadToken = async () => {
+      try {
+        const token = await AsyncStorage.getItem("userToken");
+        const userData = await AsyncStorage.getItem("userData");
+
+        setUserToken(token);
+
+        if (userData) {
+          try {
+            const userInfo = JSON.parse(userData);
+            setUser(userInfo);
+          } catch (error) {
+            console.error(error);
+            await signOut();
+          }
+        }
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadToken();
+  }, []);
+
   const signIn = async (token: string, userData: User) => {
-    setUserToken(token);
-    setUser(userData);
-    setIsLoading(false);
+    try {
+      await AsyncStorage.setItem("userToken", token);
+      await AsyncStorage.setItem("userData", JSON.stringify(userData));
+      setUserToken(token);
+      setUser(userData);
+    } catch (error) {
+      console.error(error);
+    }
   };
 
   const signOut = async () => {

@@ -1,89 +1,101 @@
-import React, { useState } from "react";
-import { Alert, Text, TouchableOpacity } from "react-native";
-import { TextInput } from "react-native-gesture-handler";
-import { View } from "react-native-reanimated/lib/typescript/Animated";
+import { useAuth } from "@/context/AuthContext";
+import { useState } from "react";
+import { Alert, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import tw from "twrnc";
 
-const apiUrl = "https://keep.kevindupas.com/api"
+const apiUrl = "https://keep.kevindupas.com/api";
 
-export default function Login(){
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
-    const [loading, setLoading] = useState(false);
-    const [debug, setDebug] = useState("");
+export default function LoginScreen() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [debug, setDebug] = useState("");
+  const { signIn } = useAuth();
 
-
-    const handleLoading = async () => {
-        if(!email || !password){
-            Alert.alert("Erreur", "Veuillez replir tous les champs");
-            return;
-        }
-
-        setLoading(true);
-        setDebug("Démarre la connexion..")
-
-        try {
-            setDebug((prev) => prev + `Url de l'API: ${apiUrl}/login`)
-            const reponse = await fetch(`${apiUrl}/login`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    Accept: "application/json"
-                },
-                body: JSON.stringify({ email, password}),
-            });
-
-            const rawText = await reponse.text();
-            setDebug((prev) => prev + `Réponse brute: ${rawText.substring(0, 50)}...\n`);
-            let data;
-            try{
-                data = JSON.parse(rawText);
-                setDebug((prev) => prev + `Réponse parsé avec succés\n`);
-            } catch(e) {
-
-            }
-
-            setDebug((prev) => prev + `Connexion réussie\n`);
-            await signIn(data.access_token, data.user);
-        } catch(e) {
-            
-        }
+  const handleLogin = async () => {
+    if (!email || !password) {
+      Alert.alert("Erreur", "Veuillez remplir tous les champs");
+      return;
     }
 
-    return (
-        <SafeAreaView style={tw `flex-1 bg-white`}>
-            <TextInput
-            placeholder="Email"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            />
+    setLoading(true);
+    setDebug("Démarre la connexion...");
 
-            <TextInput
-            placeholder="Mot de passe"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            />
+    try {
+      setDebug((prev) => prev + `URL de l'API: ${apiUrl}/login`);
 
-            <TouchableOpacity
-            onPress={handleLoading}
-            disabled={loading}
-            >
-                <Text>
-                Connexion
-                </Text>
+      const response = await fetch(`${apiUrl}/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      });
 
-            
-            </TouchableOpacity>
+      const rawText = await response.text();
+      setDebug(
+        (prev) => prev + `Réponse brute: ${rawText.substring(0, 50)}...\n`
+      );
 
-            {debug ?(
-                <View>
-                    <Text>(debug)</Text>
-                </View>
-            ) : null }
-        </SafeAreaView>
-    )
+      let data;
+      try {
+        data = JSON.parse(rawText);
+        setDebug((prev) => prev + `Réponse parsé avec succès\n`);
+      } catch (error) {
+        setDebug((prev) => prev + `Erreur: ${(error as Error).message}`);
+        return;
+      }
+
+      setDebug((prev) => prev + `Connexion réussie\n`);
+
+      await signIn(data.access_token, data.user);
+    } catch (error) {
+      setDebug((prev) => prev + `Erreur: ${(error as Error).message}`);
+    }
+  };
+
+  return (
+    <SafeAreaView style={tw`flex-1 bg-white dark:bg-black`}>
+      <Text style={tw`text-black dark:text-white text-center font-bold`}>
+        Connexion
+      </Text>
+
+      <TextInput
+        style={tw`p-3 bg-gray-200 dark:bg-gray-800 rounded-lg mt-4`}
+        placeholder="Email"
+        value={email}
+        onChangeText={setEmail}
+        keyboardType="email-address"
+        autoCapitalize="none"
+      />
+
+      <TextInput
+        style={tw`p-3 bg-gray-200 dark:bg-gray-800 rounded-lg mt-4`}
+        placeholder="Mot de passe"
+        value={password}
+        onChangeText={setPassword}
+        secureTextEntry
+      />
+
+      <TouchableOpacity
+        onPress={handleLogin}
+        disabled={loading}
+        style={tw`p-3 bg-gray-200 dark:bg-gray-800 rounded-lg mt-4`}
+      >
+        <Text style={tw`text-black dark:text-white text-center font-bold`}>
+          Connexion
+        </Text>
+      </TouchableOpacity>
+
+      {debug ? (
+        <View style={tw`p-4 bg-gray-200 dark:bg-gray-800 rounded-lg mt-4`}>
+          <Text style={tw`text-black dark:text-white text-center font-bold`}>
+            {debug}
+          </Text>
+        </View>
+      ) : null}
+    </SafeAreaView>
+  );
 }

@@ -11,6 +11,12 @@ import {
 // Remplace cette URL par l'endpoint de ton API de tâches
 const tasksApiUrl = "https://keep.kevindupas.com/api/tasks";
 
+type Task = {
+  id: number;
+  title: string;
+  completed: boolean;
+};
+
 export default function TasksScreen() {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -33,11 +39,11 @@ export default function TasksScreen() {
     }
   };
 
-  const renderTask = ({ item }) => (
+  const renderTask = ({ tasks }: { item: Task }) => (
     <TouchableOpacity style={styles.taskCard}>
-      <Text style={styles.taskTitle}>{item.title}</Text>
+      <Text style={styles.taskTitle}>{tasks.title}</Text>
       <Text style={styles.taskStatus}>
-        Statut : {item.completed ? "✔️ Terminée" : "❌ En cours"}
+        Statut : {tasks.completed ? "✔️ Terminée" : "❌ En cours"}
       </Text>
     </TouchableOpacity>
   );

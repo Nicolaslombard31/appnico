@@ -10,41 +10,62 @@ import {
 } from "react-native";
 import { Link, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useAuth } from "@/context/AuthContext";
+import * as SecureStore from "expo-secure-store";
+import * as Network from "expo-network";
 
 const apiUrl = process.env.EXPO_PUBLIC_API_URL;
 
-export default function LoginScreen() {
-  const [notes, setNotes] = useState([]);
+export default function RegisterScreen() {
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordConfirmation, setPasswordConfirmation] = useState("");
   const [loading, setLoading] = useState(false);
   const [debug, setDebug] = useState("");
-  const { signIn } = useAuth();
   const router = useRouter();
 
-  const handleLogin = async () => {
-    if (!email || !password) {
+  const handleRegister = async () => {
+    if (!name || !email || !password || !passwordConfirmation) {
       Alert.alert("Erreur", "Veuillez remplir tous les champs");
       return;
     }
 
+    if (password !== passwordConfirmation) {
+      Alert.alert("Erreur", "Les mots de passe ne correspondent pas");
+      return;
+    }
+
     setLoading(true);
-    setDebug("Démarrage de la connexion...\n");
+    setDebug("Démarrage de l'inscription...\n");
 
     try {
-      setDebug((prev) => prev + `URL: ${apiUrl}/login\n`);
+      // Vérifier la connectivité réseau
+      const networkState = await Network.getNetworkStateAsync();
+      setDebug(
+        (prev) => prev + `État du réseau: ${JSON.stringify(networkState)}\n`
+      );
 
-      const response = await fetch(`${apiUrl}/login`, {
+      if (!networkState.isConnected || !networkState.isInternetReachable) {
+        throw new Error("Pas de connexion internet");
+      }
+
+      const requestData = {
+        name,
+        email,
+        password,
+        password_confirmation: passwordConfirmation,
+      };
+
+      setDebug((prev) => prev + `Données: ${JSON.stringify(requestData)}\n`);
+      setDebug((prev) => prev + `URL: ${apiUrl}/register\n`);
+
+      const response = await fetch(`${apiUrl}/register`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Accept: "application/json",
         },
-        body: JSON.stringify({
-          email,
-          password,
-        }),
+        body: JSON.stringify(requestData),
       });
 
       setDebug((prev) => prev + `Statut HTTP: ${response.status}\n`);
@@ -71,27 +92,46 @@ export default function LoginScreen() {
       try {
         // Essayer de parser le texte en JSON
         data = JSON.parse(rawText);
-      } catch (parseError) {}
+        setDebug((prev) => prev + "Réponse parsée avec succès en JSON\n");
+      } catch (parseError) {
+        setDebug(
+          (prev) =>
+            prev + `Erreur de parsing JSON: ${(parseError as Error).message}\n`
+        );
+        // Si le texte commence par "<", c'est probablement du HTML
+        if (rawText.trim().startsWith("<")) {
+          setDebug(
+            (prev) => prev + "La réponse semble être du HTML, pas du JSON\n"
+          );
+        }
+        throw new Error(
+          "La réponse du serveur n'est pas au format JSON valide"
+        );
+      }
 
       if (!response.ok) {
         const errorMessage = data.errors
           ? Object.values(data.errors).flat().join("\n")
-          : data.message || "Identifiants incorrects";
+          : data.message || "Erreur lors de l'inscription";
         throw new Error(errorMessage);
       }
 
-      setDebug((prev) => prev + "Connexion réussie!\n");
+      setDebug((prev) => prev + "Inscription réussie!\n");
 
-      // Utiliser le contexte d'authentification pour la connexion
-      await signIn(data.access_token, data.user);
+      // Enregistrer le token
+      await SecureStore.setItemAsync("userToken", data.access_token);
+      await SecureStore.setItemAsync("userData", JSON.stringify(data.user));
 
-      // Pas besoin de rediriger, le contexte d'authentification s'en charge
+      // Rediriger vers l'écran principal
+      router.replace("/(tabs)");
     } catch (error) {
       const errorMessage =
-        error instanceof Error ? error.message : "Une erreur est survenue";
+        error instanceof Error
+          ? error.message
+          : "Une erreur inattendue s'est produite";
 
       setDebug((prev) => prev + `ERREUR: ${errorMessage}\n`);
-      Alert.alert("Erreur de connexion", errorMessage);
+      Alert.alert("Erreur d'inscription", errorMessage);
     } finally {
       setLoading(false);
     }
@@ -100,7 +140,15 @@ export default function LoginScreen() {
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <StatusBar style="auto" />
-      <Text style={styles.title}>Connexion</Text>
+      <Text style={styles.title}>Créer un compte</Text>
+
+      <TextInput
+        style={styles.input}
+        placeholder="Nom"
+        value={name}
+        onChangeText={setName}
+        autoCapitalize="words"
+      />
 
       <TextInput
         style={styles.input}
@@ -119,20 +167,28 @@ export default function LoginScreen() {
         secureTextEntry
       />
 
+      <TextInput
+        style={styles.input}
+        placeholder="Confirmer le mot de passe"
+        value={passwordConfirmation}
+        onChangeText={setPasswordConfirmation}
+        secureTextEntry
+      />
+
       <TouchableOpacity
         style={[styles.button, loading && styles.buttonDisabled]}
-        onPress={handleLogin}
+        onPress={handleRegister}
         disabled={loading}
       >
         <Text style={styles.buttonText}>
-          {loading ? "Connexion..." : "Se connecter"}
+          {loading ? "Inscription..." : "S'inscrire"}
         </Text>
       </TouchableOpacity>
 
-      <View style={styles.links}>
-        <Link href="/auth/register" asChild>
+      <View style={styles.linkContainer}>
+        <Link href="/auth/login" asChild>
           <TouchableOpacity>
-            <Text style={styles.link}>Créer un compte</Text>
+            <Text style={styles.link}>Déjà un compte ? Se connecter</Text>
           </TouchableOpacity>
         </Link>
       </View>
@@ -153,12 +209,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     padding: 20,
     justifyContent: "center",
-  },
-  qrButton: {
-    backgroundColor: "#4CAF50",
-    padding: 12,
-    borderRadius: 6,
-    marginTop: 10,
   },
   title: {
     fontSize: 24,
@@ -189,10 +239,9 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     fontSize: 16,
   },
-  links: {
+  linkContainer: {
     marginTop: 20,
-    flexDirection: "row",
-    justifyContent: "space-between",
+    alignItems: "center",
   },
   link: {
     color: "#007BFF",

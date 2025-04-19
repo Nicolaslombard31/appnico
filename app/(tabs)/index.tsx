@@ -1,52 +1,92 @@
-import { StyleSheet, Image, Platform, Button } from "react-native";
+import React, { useEffect, useState } from "react";
+import {
+  View,
+  Text,
+  FlatList,
+  StyleSheet,
+  ActivityIndicator,
+  TouchableOpacity,
+} from "react-native";
 
-import { Collapsible } from "@/components/Collapsible";
-import { ExternalLink } from "@/components/ExternalLink";
-import ParallaxScrollView from "@/components/ParallaxScrollView";
-import { ThemedText } from "@/components/ThemedText";
-import { ThemedView } from "@/components/ThemedView";
-import { IconSymbol } from "@/components/ui/IconSymbol";
-import { useAuth } from "@/context/AuthContext";
+const apiUrl = "https://keep.kevindupas.com/api/notes";
 
-export default function Index() {
-  const { user, userToken, signOut } = useAuth();
+export default function NotesScreen() {
+  const [notes, setNotes] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchNotes();
+  }, []);
+
+  const fetchNotes = async () => {
+    console.log(apiUrl);
+    try {
+      const response = await fetch(apiUrl);
+      const data = await response.json();
+      console.log("Réponse API :", data);
+      setNotes(data.notes); // ou peut-être data directement
+    } catch (error) {
+      console.error("Erreur de chargement :", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+
+  const renderNote = ({ item }) => (
+    <TouchableOpacity style={styles.noteCard}>
+      <Text style={styles.noteTitle}>{item.title}</Text>
+      <Text style={styles.noteContent} numberOfLines={3}>
+        {item.content}
+      </Text>
+    </TouchableOpacity>
+  );
+
+  if (loading) {
+    return (
+      <View style={styles.loaderContainer}>
+        <ActivityIndicator size="large" color="#007BFF" />
+      </View>
+    );
+  }
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: "#D0D0D0", dark: "#353636" }}
-      headerImage={
-        <IconSymbol
-          size={310}
-          color="#808080"
-          name="chevron.left.forwardslash.chevron.right"
-          style={styles.headerImage}
-        />
-      }
-    >
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Explore</ThemedText>
-      </ThemedView>
-      <ThemedText>
-        {user ? `Welcome, ${user.name}!` : "Welcome to your new app!"}
-      </ThemedText>
-      <ThemedText>
-        {userToken ? "You are authenticated." : "You are not authenticated."}
-      </ThemedText>
-      <ThemedText>
-        <Button title="Sign Out" onPress={signOut} />
-      </ThemedText>
-    </ParallaxScrollView>
+    <FlatList
+      data={notes}
+      renderItem={renderNote}
+      keyExtractor={(item) => item.id.toString()}
+      numColumns={2} // <= pour affichage en grille
+      contentContainerStyle={styles.grid}
+    />
   );
 }
 
 const styles = StyleSheet.create({
-  headerImage: {
-    color: "#808080",
-    bottom: -90,
-    left: -35,
-    position: "absolute",
+  grid: {
+    padding: 10,
   },
-  titleContainer: {
-    flexDirection: "row",
-    gap: 8,
+  noteCard: {
+    flex: 1,
+    margin: 8,
+    backgroundColor: "#f8f8f8",
+    padding: 12,
+    borderRadius: 8,
+    minHeight: 120,
+    justifyContent: "space-between",
+    elevation: 3,
+  },
+  noteTitle: {
+    fontWeight: "bold",
+    fontSize: 16,
+    marginBottom: 4,
+  },
+  noteContent: {
+    fontSize: 14,
+    color: "#555",
+  },
+  loaderContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
 });
